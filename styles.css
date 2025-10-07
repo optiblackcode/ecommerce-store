@@ -758,10 +758,19 @@ main {
     
     nav {
         gap: 0.5rem;
+        flex-wrap: wrap;
     }
     
     .nav-btn, .cart-btn {
         padding: 0.5rem;
         font-size: 0.875rem;
+    }
+    
+    .admin-order-content {
+        grid-template-columns: 1fr;
+    }
+    
+    .details-grid {
+        grid-template-columns: 1fr;
     }
 }
