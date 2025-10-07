@@ -497,6 +497,16 @@ main {
     justify-content: space-between;
     align-items: start;
     margin-bottom: 1rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.order-header:hover {
+    opacity: 0.8;
+}
+
+.expand-icon {
+    transition: transform 0.3s;
 }
 
 .order-id {
@@ -540,6 +550,188 @@ main {
 
 .order-total-amount {
     color: #2563eb;
+}
+
+/* Order Details (Expandable) */
+.order-details {
+    border-top: 1px solid #e5e7eb;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.details-section {
+    margin-bottom: 1.5rem;
+}
+
+.details-section h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: #374151;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.detail-value {
+    font-size: 0.875rem;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* Admin Styles */
+.admin-btn {
+    background: #7c3aed;
+    color: white;
+}
+
+.admin-btn:hover {
+    background: #6d28d9;
+}
+
+.admin-header {
+    margin-bottom: 2rem;
+}
+
+.admin-header h2 {
+    font-size: 1.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.admin-subtitle {
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+.admin-order-card {
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #2563eb;
+}
+
+.admin-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.admin-status-controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.status-select {
+    padding: 0.5rem 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: white;
+}
+
+.status-select:focus {
+    outline: none;
+    border-color: #2563eb;
+}
+
+.status-select option[value="Processing"] {
+    color: #92400e;
+}
+
+.status-select option[value="Shipped"] {
+    color: #1e40af;
+}
+
+.status-select option[value="Delivered"] {
+    color: #065f46;
+}
+
+.status-select option[value="Cancelled"] {
+    color: #991b1b;
+}
+
+.admin-order-content {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 2rem;
+}
+
+.admin-section {
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+}
+
+.admin-section h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.admin-section p {
+    margin: 0.25rem 0;
+    font-size: 0.875rem;
+}
+
+.admin-item-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 0.875rem;
+}
+
+.admin-item-row:last-child {
+    border-bottom: none;
+}
+
+.admin-total {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 2px solid #d1d5db;
+    text-align: right;
+    color: #2563eb;
+    font-size: 1.125rem;
 }
 
 /* Responsive Design */
