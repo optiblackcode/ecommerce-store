@@ -503,3 +503,143 @@ function renderOrders() {
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">City:</span>
+                            <span class="detail-value">${order.customer.city}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ZIP:</span>
+                            <span class="detail-value">${order.customer.zip}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="details-section">
+                    <h4>Payment Information</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Card:</span>
+                            <span class="detail-value">**** **** **** ${order.customer.cardNumber.slice(-4)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Cardholder:</span>
+                            <span class="detail-value">${order.customer.cardName}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleOrderDetails(index) {
+    const details = document.getElementById(`order-details-${index}`);
+    const icon = document.getElementById(`expand-${index}`);
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+        
+        trackEvent('Order Details Expanded', {
+            order_id: orders[index].id,
+            order_total: orders[index].total
+        });
+    } else {
+        details.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
+function updateOrdersButton() {
+    const ordersBtn = document.getElementById('orders-btn');
+    ordersBtn.style.display = orders.length > 0 ? 'flex' : 'none';
+}
+
+// Admin Functions
+function renderAdmin() {
+    const adminList = document.getElementById('admin-orders-list');
+    
+    if (orders.length === 0) {
+        adminList.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No orders to manage.</p>';
+        return;
+    }
+    
+    adminList.innerHTML = orders.map((order, index) => `
+        <div class="admin-order-card">
+            <div class="admin-order-header">
+                <div>
+                    <h3 class="order-id">${order.id}</h3>
+                    <p class="order-date">${new Date(order.date).toLocaleDateString()} ${new Date(order.date).toLocaleTimeString()}</p>
+                </div>
+                <div class="admin-status-controls">
+                    <select class="status-select" id="status-${index}" onchange="updateOrderStatus(${index}, this.value)">
+                        <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>Processing</option>
+                        <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
+                        <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                        <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="admin-order-content">
+                <div class="admin-section">
+                    <h4>Customer</h4>
+                    <p><strong>${order.customer.name}</strong></p>
+                    <p>${order.customer.email}</p>
+                    <p>${order.customer.address}, ${order.customer.city} ${order.customer.zip}</p>
+                </div>
+                <div class="admin-section">
+                    <h4>Order Items</h4>
+                    ${order.items.map(item => `
+                        <div class="admin-item-row">
+                            <span>${item.name}</span>
+                            <span>Qty: ${item.quantity}</span>
+                            <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                    <div class="admin-total">
+                        <strong>Total: ${order.total.toFixed(2)}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateOrderStatus(index, newStatus) {
+    const oldStatus = orders[index].status;
+    orders[index].status = newStatus;
+    saveOrders();
+    
+    // Track status change
+    trackEvent('Order Status Updated', {
+        order_id: orders[index].id,
+        old_status: oldStatus,
+        new_status: newStatus,
+        order_total: orders[index].total,
+        customer_email: orders[index].customer.email
+    });
+    
+    // Show success message
+    const statusSelect = document.getElementById(`status-${index}`);
+    const originalBg = statusSelect.style.background;
+    statusSelect.style.background = '#10b981';
+    statusSelect.style.color = 'white';
+    setTimeout(() => {
+        statusSelect.style.background = originalBg;
+        statusSelect.style.color = '';
+    }, 500);
+}
+
+// Admin password check
+function checkAdminAccess() {
+    const password = prompt('Enter admin password:');
+    if (password === 'admin123') {
+        trackEvent('Admin Access Granted', {
+            timestamp: new Date().toISOString()
+        });
+        showView('admin');
+        renderAdmin();
+    } else if (password !== null) {
+        trackEvent('Admin Access Denied', {
+            timestamp: new Date().toISOString()
+        });
+        alert('Incorrect password!');
+    }
+}
