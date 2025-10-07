@@ -279,32 +279,166 @@ function renderOrders() {
         return;
     }
     
-    ordersList.innerHTML = orders.map(order => `
+    ordersList.innerHTML = orders.map((order, index) => `
         <div class="order-card">
-            <div class="order-header">
+            <div class="order-header" onclick="toggleOrderDetails(${index})">
                 <div>
                     <h3 class="order-id">${order.id}</h3>
-                    <p class="order-date">${new Date(order.date).toLocaleDateString()}</p>
+                    <p class="order-date">${new Date(order.date).toLocaleDateString()} ${new Date(order.date).toLocaleTimeString()}</p>
                 </div>
-                <span class="order-status">${order.status}</span>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span class="order-status">${order.status}</span>
+                    <svg class="expand-icon" id="expand-${index}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </div>
             </div>
             <div class="order-items">
                 ${order.items.map(item => `
                     <div class="order-item-row">
                         <span>${item.name} x ${item.quantity}</span>
-                        <span>$${(item.price * item.quantity).toFixed(2)}</span>
+                        <span>${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                 `).join('')}
                 <div class="order-total-row">
                     <span>Total:</span>
-                    <span class="order-total-amount">$${order.total.toFixed(2)}</span>
+                    <span class="order-total-amount">${order.total.toFixed(2)}</span>
+                </div>
+            </div>
+            <div class="order-details" id="order-details-${index}" style="display: none;">
+                <div class="details-section">
+                    <h4>Customer Information</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Name:</span>
+                            <span class="detail-value">${order.customer.name}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Email:</span>
+                            <span class="detail-value">${order.customer.email}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Address:</span>
+                            <span class="detail-value">${order.customer.address}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">City:</span>
+                            <span class="detail-value">${order.customer.city}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">ZIP:</span>
+                            <span class="detail-value">${order.customer.zip}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="details-section">
+                    <h4>Payment Information</h4>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Card:</span>
+                            <span class="detail-value">**** **** **** ${order.customer.cardNumber.slice(-4)}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Cardholder:</span>
+                            <span class="detail-value">${order.customer.cardName}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     `).join('');
 }
 
+function toggleOrderDetails(index) {
+    const details = document.getElementById(`order-details-${index}`);
+    const icon = document.getElementById(`expand-${index}`);
+    
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        details.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+
 function updateOrdersButton() {
     const ordersBtn = document.getElementById('orders-btn');
     ordersBtn.style.display = orders.length > 0 ? 'flex' : 'none';
+}
+
+// Admin Functions
+function renderAdmin() {
+    const adminList = document.getElementById('admin-orders-list');
+    
+    if (orders.length === 0) {
+        adminList.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No orders to manage.</p>';
+        return;
+    }
+    
+    adminList.innerHTML = orders.map((order, index) => `
+        <div class="admin-order-card">
+            <div class="admin-order-header">
+                <div>
+                    <h3 class="order-id">${order.id}</h3>
+                    <p class="order-date">${new Date(order.date).toLocaleDateString()} ${new Date(order.date).toLocaleTimeString()}</p>
+                </div>
+                <div class="admin-status-controls">
+                    <select class="status-select" id="status-${index}" onchange="updateOrderStatus(${index}, this.value)">
+                        <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>Processing</option>
+                        <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
+                        <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+                        <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
+                    </select>
+                </div>
+            </div>
+            <div class="admin-order-content">
+                <div class="admin-section">
+                    <h4>Customer</h4>
+                    <p><strong>${order.customer.name}</strong></p>
+                    <p>${order.customer.email}</p>
+                    <p>${order.customer.address}, ${order.customer.city} ${order.customer.zip}</p>
+                </div>
+                <div class="admin-section">
+                    <h4>Order Items</h4>
+                    ${order.items.map(item => `
+                        <div class="admin-item-row">
+                            <span>${item.name}</span>
+                            <span>Qty: ${item.quantity}</span>
+                            <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                    <div class="admin-total">
+                        <strong>Total: ${order.total.toFixed(2)}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateOrderStatus(index, newStatus) {
+    orders[index].status = newStatus;
+    saveOrders();
+    
+    // Show success message
+    const statusSelect = document.getElementById(`status-${index}`);
+    const originalBg = statusSelect.style.background;
+    statusSelect.style.background = '#10b981';
+    statusSelect.style.color = 'white';
+    setTimeout(() => {
+        statusSelect.style.background = originalBg;
+        statusSelect.style.color = '';
+    }, 500);
+}
+
+// Admin password check
+function checkAdminAccess() {
+    const password = prompt('Enter admin password:');
+    if (password === 'admin123') {
+        showView('admin');
+        renderAdmin();
+    } else if (password !== null) {
+        alert('Incorrect password!');
+    }
 }
