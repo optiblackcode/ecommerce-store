@@ -11,6 +11,44 @@ const PRODUCTS = [
 // Application State
 let cart = [];
 let orders = [];
+let currentUserEmail = null;
+
+// Mixpanel Helper Functions
+function trackEvent(eventName, properties = {}) {
+    if (typeof mixpanel !== 'undefined') {
+        mixpanel.track(eventName, properties);
+        console.log('📊 Tracked:', eventName, properties);
+    }
+}
+
+function identifyUser(email) {
+    if (typeof mixpanel !== 'undefined' && email) {
+        mixpanel.identify(email);
+        currentUserEmail = email;
+        console.log('👤 User identified:', email);
+    }
+}
+
+function setUserProperties(properties) {
+    if (typeof mixpanel !== 'undefined' && currentUserEmail) {
+        mixpanel.people.set(properties);
+        console.log('📝 User properties set:', properties);
+    }
+}
+
+function incrementUserProperty(property, value = 1) {
+    if (typeof mixpanel !== 'undefined' && currentUserEmail) {
+        mixpanel.people.increment(property, value);
+        console.log('➕ Incremented:', property, value);
+    }
+}
+
+function trackRevenue(amount, properties = {}) {
+    if (typeof mixpanel !== 'undefined' && currentUserEmail) {
+        mixpanel.people.track_charge(amount, properties);
+        console.log('💰 Revenue tracked:', amount, properties);
+    }
+}
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,15 +56,26 @@ document.addEventListener('DOMContentLoaded', () => {
     renderProducts();
     updateCartBadge();
     updateOrdersButton();
+    
+    // Track page view on load
+    trackEvent('Page Viewed', {
+        page_name: 'Products',
+        product_count: PRODUCTS.length
+    });
 });
 
 // Local Storage Functions
 function loadFromLocalStorage() {
     const savedCart = localStorage.getItem('ecommerce_cart');
     const savedOrders = localStorage.getItem('ecommerce_orders');
+    const savedEmail = localStorage.getItem('user_email');
     
     if (savedCart) cart = JSON.parse(savedCart);
     if (savedOrders) orders = JSON.parse(savedOrders);
+    if (savedEmail) {
+        currentUserEmail = savedEmail;
+        identifyUser(savedEmail);
+    }
 }
 
 function saveCart() {
@@ -51,9 +100,47 @@ function showView(viewName) {
     const navBtn = document.getElementById(`${viewName}-btn`);
     if (navBtn) navBtn.classList.add('active');
     
-    if (viewName === 'cart') renderCart();
-    if (viewName === 'checkout') renderCheckout();
-    if (viewName === 'orders') renderOrders();
+    // Track page views
+    if (viewName === 'products') {
+        trackEvent('Page Viewed', {
+            page_name: 'Products',
+            product_count: PRODUCTS.length
+        });
+        renderProducts();
+    }
+    
+    if (viewName === 'cart') {
+        const cartTotal = getCartTotal();
+        const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+        
+        trackEvent('Cart Viewed', {
+            cart_total: cartTotal,
+            item_count: itemCount,
+            cart_items: cart.map(item => ({
+                product_name: item.name,
+                quantity: item.quantity,
+                price: item.price
+            }))
+        });
+        renderCart();
+    }
+    
+    if (viewName === 'checkout') {
+        trackEvent('Checkout Started', {
+            cart_total: getCartTotal(),
+            item_count: cart.reduce((sum, item) => sum + item.quantity, 0),
+            items_list: cart.map(item => item.name).join(', ')
+        });
+        renderCheckout();
+    }
+    
+    if (viewName === 'orders') {
+        trackEvent('Page Viewed', {
+            page_name: 'Orders',
+            total_orders: orders.length
+        });
+        renderOrders();
+    }
 }
 
 // Product Functions
@@ -95,6 +182,16 @@ function addToCart(productId) {
     
     saveCart();
     updateCartBadge();
+    
+    // Track add to cart event
+    trackEvent('Product Added to Cart', {
+        product_id: product.id,
+        product_name: product.name,
+        product_price: product.price,
+        product_category: product.category,
+        quantity: 1,
+        cart_total: getCartTotal()
+    });
     
     // Show feedback
     const btn = event.target.closest('.btn-add-cart');
@@ -189,9 +286,29 @@ function renderCart() {
 function updateQuantity(productId, delta) {
     const item = cart.find(item => item.id === productId);
     if (item) {
+        const oldQuantity = item.quantity;
         item.quantity = Math.max(0, item.quantity + delta);
+        
         if (item.quantity === 0) {
             cart = cart.filter(item => item.id !== productId);
+            trackEvent('Product Removed from Cart', {
+                product_id: productId,
+                product_name: item.name
+            });
+        } else if (delta > 0) {
+            trackEvent('Cart Quantity Increased', {
+                product_id: productId,
+                product_name: item.name,
+                old_quantity: oldQuantity,
+                new_quantity: item.quantity
+            });
+        } else {
+            trackEvent('Cart Quantity Decreased', {
+                product_id: productId,
+                product_name: item.name,
+                old_quantity: oldQuantity,
+                new_quantity: item.quantity
+            });
         }
     }
     saveCart();
@@ -200,7 +317,15 @@ function updateQuantity(productId, delta) {
 }
 
 function removeFromCart(productId) {
+    const item = cart.find(item => item.id === productId);
     cart = cart.filter(item => item.id !== productId);
+    
+    trackEvent('Product Removed from Cart', {
+        product_id: productId,
+        product_name: item.name,
+        quantity_removed: item.quantity
+    });
+    
     saveCart();
     updateCartBadge();
     renderCart();
@@ -237,17 +362,72 @@ function completeCheckout() {
     
     // Create order
     const orderId = 'ORD-' + Date.now();
+    const orderTotal = getCartTotal();
     const newOrder = {
         id: orderId,
         date: new Date().toISOString(),
         items: [...cart],
-        total: getCartTotal(),
+        total: orderTotal,
         customer: { ...formData },
         status: 'Processing'
     };
     
     orders.push(newOrder);
     saveOrders();
+    
+    // Identify user in Mixpanel
+    identifyUser(formData.email);
+    localStorage.setItem('user_email', formData.email);
+    
+    // Track payment completed
+    trackEvent('Payment Completed', {
+        order_id: orderId,
+        total_amount: orderTotal,
+        item_count: cart.reduce((sum, item) => sum + item.quantity, 0),
+        items_purchased: cart.map(item => ({
+            product_name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            category: item.category
+        })),
+        customer_email: formData.email,
+        customer_city: formData.city,
+        customer_zip: formData.zip
+    });
+    
+    // Track revenue
+    trackRevenue(orderTotal, {
+        'Order ID': orderId,
+        'Items Count': cart.length
+    });
+    
+    // Update user profile properties
+    const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
+    const productsPurchased = orders.flatMap(order => 
+        order.items.map(item => item.name)
+    );
+    const categories = orders.flatMap(order => 
+        order.items.map(item => item.category)
+    );
+    const favoriteCategory = categories.sort((a,b) =>
+        categories.filter(v => v===a).length - categories.filter(v => v===b).length
+    ).pop();
+    
+    setUserProperties({
+        '$email': formData.email,
+        '$name': formData.name,
+        'Total Orders': orders.length,
+        'Total Spent': totalSpent,
+        'Average Order Value': totalSpent / orders.length,
+        'Last Purchase Date': new Date().toISOString(),
+        'Products Purchased': productsPurchased,
+        'Favorite Category': favoriteCategory,
+        'Last Order ID': orderId
+    });
+    
+    // Increment counters
+    incrementUserProperty('Lifetime Orders', 1);
+    incrementUserProperty('Lifetime Revenue', orderTotal);
     
     // Clear cart and form
     cart = [];
@@ -288,7 +468,7 @@ function renderOrders() {
                 </div>
                 <div style="display: flex; align-items: center; gap: 1rem;">
                     <span class="order-status">${order.status}</span>
-                    <svg class="expand-icon" id="expand-${index}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg class="expand-icon" id="expand-${index}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.3s;">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
@@ -297,12 +477,12 @@ function renderOrders() {
                 ${order.items.map(item => `
                     <div class="order-item-row">
                         <span>${item.name} x ${item.quantity}</span>
-                        <span>${(item.price * item.quantity).toFixed(2)}</span>
+                        <span>$${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                 `).join('')}
                 <div class="order-total-row">
                     <span>Total:</span>
-                    <span class="order-total-amount">${order.total.toFixed(2)}</span>
+                    <span class="order-total-amount">$${order.total.toFixed(2)}</span>
                 </div>
             </div>
             <div class="order-details" id="order-details-${index}" style="display: none;">
@@ -323,122 +503,3 @@ function renderOrders() {
                         </div>
                         <div class="detail-item">
                             <span class="detail-label">City:</span>
-                            <span class="detail-value">${order.customer.city}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">ZIP:</span>
-                            <span class="detail-value">${order.customer.zip}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="details-section">
-                    <h4>Payment Information</h4>
-                    <div class="details-grid">
-                        <div class="detail-item">
-                            <span class="detail-label">Card:</span>
-                            <span class="detail-value">**** **** **** ${order.customer.cardNumber.slice(-4)}</span>
-                        </div>
-                        <div class="detail-item">
-                            <span class="detail-label">Cardholder:</span>
-                            <span class="detail-value">${order.customer.cardName}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function toggleOrderDetails(index) {
-    const details = document.getElementById(`order-details-${index}`);
-    const icon = document.getElementById(`expand-${index}`);
-    
-    if (details.style.display === 'none') {
-        details.style.display = 'block';
-        icon.style.transform = 'rotate(180deg)';
-    } else {
-        details.style.display = 'none';
-        icon.style.transform = 'rotate(0deg)';
-    }
-}
-
-function updateOrdersButton() {
-    const ordersBtn = document.getElementById('orders-btn');
-    ordersBtn.style.display = orders.length > 0 ? 'flex' : 'none';
-}
-
-// Admin Functions
-function renderAdmin() {
-    const adminList = document.getElementById('admin-orders-list');
-    
-    if (orders.length === 0) {
-        adminList.innerHTML = '<p style="text-align: center; color: #6b7280; padding: 2rem;">No orders to manage.</p>';
-        return;
-    }
-    
-    adminList.innerHTML = orders.map((order, index) => `
-        <div class="admin-order-card">
-            <div class="admin-order-header">
-                <div>
-                    <h3 class="order-id">${order.id}</h3>
-                    <p class="order-date">${new Date(order.date).toLocaleDateString()} ${new Date(order.date).toLocaleTimeString()}</p>
-                </div>
-                <div class="admin-status-controls">
-                    <select class="status-select" id="status-${index}" onchange="updateOrderStatus(${index}, this.value)">
-                        <option value="Processing" ${order.status === 'Processing' ? 'selected' : ''}>Processing</option>
-                        <option value="Shipped" ${order.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
-                        <option value="Delivered" ${order.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                        <option value="Cancelled" ${order.status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                    </select>
-                </div>
-            </div>
-            <div class="admin-order-content">
-                <div class="admin-section">
-                    <h4>Customer</h4>
-                    <p><strong>${order.customer.name}</strong></p>
-                    <p>${order.customer.email}</p>
-                    <p>${order.customer.address}, ${order.customer.city} ${order.customer.zip}</p>
-                </div>
-                <div class="admin-section">
-                    <h4>Order Items</h4>
-                    ${order.items.map(item => `
-                        <div class="admin-item-row">
-                            <span>${item.name}</span>
-                            <span>Qty: ${item.quantity}</span>
-                            <span>${(item.price * item.quantity).toFixed(2)}</span>
-                        </div>
-                    `).join('')}
-                    <div class="admin-total">
-                        <strong>Total: ${order.total.toFixed(2)}</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function updateOrderStatus(index, newStatus) {
-    orders[index].status = newStatus;
-    saveOrders();
-    
-    // Show success message
-    const statusSelect = document.getElementById(`status-${index}`);
-    const originalBg = statusSelect.style.background;
-    statusSelect.style.background = '#10b981';
-    statusSelect.style.color = 'white';
-    setTimeout(() => {
-        statusSelect.style.background = originalBg;
-        statusSelect.style.color = '';
-    }, 500);
-}
-
-// Admin password check
-function checkAdminAccess() {
-    const password = prompt('Enter admin password:');
-    if (password === 'admin123') {
-        showView('admin');
-        renderAdmin();
-    } else if (password !== null) {
-        alert('Incorrect password!');
-    }
-}
